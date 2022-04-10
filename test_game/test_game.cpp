@@ -3,6 +3,10 @@
 #include <iostream>
 #include <vector>
 #include <iterator>
+#include <string>
+#include <iterator>
+#include <regex>
+#include <sstream>
 
 int WINDOW_WIDTH = 800;
 int WINDOW_HEIGHT = 600;
@@ -17,7 +21,6 @@ enum class Ability {
 	ROCKET,
 	AUTO_SHOOT
 };
-
 
 class Object {
 public:
@@ -133,8 +136,8 @@ public:
 		object = createSprite(new_path);
 		if (is_rand)
 		{
-			x = rand() % int((WINDOW_WIDTH - width));
-			y = rand() % int((WINDOW_HEIGHT - height));
+			x = WINDOW_WIDTH / 2;
+			y = WINDOW_HEIGHT / 2;
 			while (x > WINDOW_WIDTH / 2 - 150 && x < WINDOW_WIDTH / 2 + 150 
 				&& y > WINDOW_HEIGHT / 2 - 150 && y < WINDOW_HEIGHT / 2 + 150)
 			{
@@ -463,23 +466,31 @@ private:
 class Reticle : public Object
 {
 public:
-	Reticle(double bullet_reload_duration = 20) : reload_duration(bullet_reload_duration){
+	Reticle(double bullet_reload_duration = 30) : reload_duration(bullet_reload_duration){
 		object = createSprite("data/reticle2.png");
 		width = 65;
 		height = 64;
 		y = 0;
 		x = 0;
+		ammo_count = NUM_AMMO;
+		time = 0;
 	}
 	void SetPos(int x_mouse, int y_mouse) {
 		y = y_mouse - height / 2;
 		x = x_mouse - width / 2;
 	}
-	void Shoot(int x_ship, int y_ship) {
+	void Shoot(int in_x_ship, int in_y_ship) {
 		if (reload_time < 0.1)
 		{
+			x_ship = in_x_ship;
+			y_ship = in_y_ship;
 			bullets.push_back(new Bullet(x_ship, y_ship, GetCenter().first, GetCenter().second));
+			x_center_temp = GetCenter().first;
+			y_center_temp = GetCenter().second;
+			time = getTickCount();
 			reload_time = reload_duration;
-		}				
+			ammo_count = 0;
+		}
 	}
 	bool Disappear(Bullet* b) {		
 		return b->Border();
@@ -495,6 +506,20 @@ public:
 		std::erase_if(bullets, [this](Bullet* b) -> bool {
 			return Disappear(b); });
 		reload_time -= 0.2;		
+		if (ammo_count >= 0 && ammo_count < NUM_AMMO-1)
+		{
+			Ammo();
+		}
+	}
+	void Ammo() {		
+		if (getTickCount() - time > 50)
+		{
+			std::cout << "!";
+			bullets.push_back(new Bullet(x_ship, y_ship, GetCenter().first, GetCenter().second));
+			time = getTickCount();
+			ammo_count++;
+		}
+		
 	}
 
 	bool CheckShoot(Asteroid* asteroid, bool is_delete = true) {
@@ -523,8 +548,13 @@ private:
 	const char* bullet_path;
 	double reload_time;
 	double reload_duration;
+	int ammo_count;
+	double x_ship;
+	double y_ship;
+	double x_center_temp;
+	double y_center_temp;
+	int time;
 };
-
 
 
 /* Test Framework realization */
@@ -555,7 +585,6 @@ public:
 		}
 		battleship = new Character();
 		reticle = new Reticle();
-		//a1 = new BigAsteroid(WINDOW_WIDTH, WINDOW_HEIGHT, 20);
 		return true;
 	}
 
@@ -565,16 +594,14 @@ public:
 
 	virtual bool Tick() {
 		showCursor(false);
-		//drawTestBackground();
-		/*for (int i = 0; i < WINDOW_WIDTH; i+=204)
+		for (int i = 0; i < WINDOW_WIDTH; i += 1000)
 		{
-			for (int j = 0; j < WINDOW_HEIGHT; j+=140)
+			for (int j = 0; j < WINDOW_HEIGHT; j += 1000)
 			{
-				drawSprite(background, i, j);
+				drawSprite(background, i-100, j-100);
 			}
-		}*/
+		}
 
-		drawSprite(background, -100, -100);
 		std::vector<Asteroid*> asteroids_temp;
 		for (auto asteroid : asteroids)
 		{
@@ -583,7 +610,7 @@ public:
 			asteroid->Draw();
 			if (battleship->CheckCollision(asteroid))
 			{
-				std::cout << "Game over!";
+				std::cout << "Game over!" << "\n";
 				return 1;
 			}
 			if (reticle->CheckShoot(asteroid, false) && asteroid->GetType() == "big")
@@ -593,7 +620,7 @@ public:
 			}
 			if (reticle->CheckShoot(asteroid, false) && asteroid->GetType() == "small")
 			{
-				if (rand()%int((ABILITY_PROBABILITY*10)) == 0)
+				if (static_cast<double>(rand()) / RAND_MAX >= 1 - ABILITY_PROBABILITY)
 				{
 					icons.push_back(new Shield(false, asteroid->GetCoords().first, asteroid->GetCoords().second));					
 				}				
@@ -680,31 +707,48 @@ private:
 	}
 };
 
-int main(int argc, char* argv[])
+int main(int argc, char** argv)
 {
-	for (int i = 0; i < sizeof(argv) - 1; i++)
+	for (int i = 0; i < argc-1; i++)
 	{
-		if (argv[i] == "-window")
+		if (strcmp(argv[i], "-window") == 0)
 		{
-			WINDOW_WIDTH = atoi(argv[i + 1]);
+			std::string str = std::string(argv[i+1]);
+			std::istringstream iss(argv[i]);
+			static const std::regex rdelim{ "x" };
+			std::vector<std::string> strPairs{
+					std::sregex_token_iterator(str.begin(), str.end(), rdelim, -1),
+					std::sregex_token_iterator()
+			};
+			WINDOW_WIDTH = stoi(strPairs[0]);
+			WINDOW_HEIGHT = stoi(strPairs[1]);
 		}
-		else if (argv[i] == "-map")
+		else if (strcmp(argv[i], "-map") == 0)
 		{
-			WINDOW_WIDTH = atoi(argv[i + 1]);
+			std::string str = std::string(argv[i + 1]);
+			std::istringstream iss(argv[i]);
+			static const std::regex rdelim{ "x" };
+			std::vector<std::string> strPairs{
+					std::sregex_token_iterator(str.begin(), str.end(), rdelim, -1),
+					std::sregex_token_iterator()
+			};
+			MAP_WIDTH = stoi(strPairs[0]);
+			MAP_HEIGHT = stoi(strPairs[1]);
 		}
-		else if (argv[i] == "-num_asteroids")
+		else if (strcmp(argv[i], "-num_asteroids") == 0)
 		{
-			WINDOW_WIDTH = atoi(argv[i + 1]);
+			NUM_ASTEROIDS = atoi(argv[i + 1]);
 		}
-		else if (argv[i] == "-num_ammo")
+		else if (strcmp(argv[i], "-num_ammo") == 0)
 		{
-			WINDOW_WIDTH = atoi(argv[i + 1]);
+			NUM_AMMO = atoi(argv[i + 1]);
 		}
-		else if (argv[i] == "-ability_probability")
+		else if (strcmp(argv[i], "-ability_probability") == 0)
 		{
-			WINDOW_WIDTH = atoi(argv[i + 1]);
+			ABILITY_PROBABILITY = std::stod(argv[i + 1]);
 		}
 	}
+	
 	srand(time(NULL));
 	while (true)
 	{
