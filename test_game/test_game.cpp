@@ -6,6 +6,18 @@
 
 int WINDOW_WIDTH = 800;
 int WINDOW_HEIGHT = 600;
+int MAP_WIDTH = 1000;
+int MAP_HEIGHT = 1000;
+int NUM_ASTEROIDS = 10;
+int NUM_AMMO = 3;
+double ABILITY_PROBABILITY = 0.3;
+
+enum class Ability {
+	SHIELD,
+	ROCKET,
+	AUTO_SHOOT
+};
+
 
 class Object {
 public:
@@ -43,6 +55,64 @@ public:
 		x_speed = speed.first;
 		y_speed = speed.second;
 	}
+
+	void MoveManual(FRKey k) {
+		switch (k)
+		{
+		case FRKey::RIGHT:
+			impulse.first = -1 * self_speed;
+			break;
+		case FRKey::LEFT:
+			impulse.first = self_speed;
+			break;
+		case FRKey::DOWN:
+			impulse.second = -1 * self_speed;
+			break;
+		case FRKey::UP:
+			impulse.second = self_speed;
+			break;
+		default:
+			break;
+		}
+	}
+	void MoveCheck() {
+		double control_num = 0.01;
+		x += impulse.first;
+		y += impulse.second;
+		impulse.first /= 1.01;
+		impulse.second /= 1.01;
+		if (abs(impulse.first) < control_num)
+		{
+			impulse.first = 0;
+		}
+		if (abs(impulse.second) < control_num)
+		{
+			impulse.second = 0;
+		}
+		Border();
+	}
+
+	void Border() {
+		
+		if (x + width / 2 >= MAP_WIDTH)
+		{
+			x = -1 * (width / 2);
+		}
+		else if (x < (width / 2) * -1)
+		{
+			x = MAP_WIDTH - width / 2;
+		}
+
+		if (y + height/2 >= MAP_HEIGHT)
+		{			
+			y = -1 * (height / 2);
+		}
+		else if (y < (height / 2) * -1)
+		{
+			y = MAP_HEIGHT - height / 2;
+		}
+
+	}
 protected:
 	const char* path;
 	Sprite* object;
@@ -51,13 +121,15 @@ protected:
 	double width;
 	double height;
 	double y_speed;
-	double x_speed;	
+	double x_speed;
+	double self_speed=2;
+	std::pair<double, double> impulse;
 };
 
 class Asteroid : public Object{
 public:
 	Asteroid(){}
-	void AsteroidSingleInit(int speed, const char* new_path, bool is_rand, int x_speed_new = 0) {
+	void AsteroidSingleInit(std::vector<Asteroid*> asteroids, int speed, const char* new_path, bool is_rand, int x_speed_new = 0) {
 		object = createSprite(new_path);
 		if (is_rand)
 		{
@@ -71,6 +143,18 @@ public:
 			}
 			y_speed = ((rand() % speed + 2) * pow(-1, rand() % 3)) / 10;
 			x_speed = ((rand() % speed + 2) * pow(-1, rand() % 3)) / 10;
+			for (auto asteroids_elem : asteroids)
+			{
+				while ((GetRadius() + asteroids_elem->GetRadius()
+					>= sqrt(pow(GetCenter().first - asteroids_elem->GetCenter().first, 2)
+						+ pow(GetCenter().second - asteroids_elem->GetCenter().second, 2)))
+					|| (x > WINDOW_WIDTH / 2 - 150 && x < WINDOW_WIDTH / 2 + 150
+							&& y > WINDOW_HEIGHT / 2 - 150 && y < WINDOW_HEIGHT / 2 + 150))
+				{
+					x = rand() % int((WINDOW_WIDTH - width));
+					y = rand() % int((WINDOW_HEIGHT - height));
+				}
+			}
 		}	
 		else
 		{
@@ -80,7 +164,6 @@ public:
 		
 	}
 	void Move() {
-		Collision();
 		y += y_speed;
 		x += x_speed;
 
@@ -95,16 +178,7 @@ public:
 
 		}
 	}
-	void Collision() {
-		if (x + width >= WINDOW_WIDTH || x <= 0)
-		{
-			x_speed *= -1;
-		}
-		if (y + height >= WINDOW_HEIGHT || y <= 0)
-		{
-			y_speed *= -1;
-		}
-	}
+	
 	void EachOtherCollision(std::vector<Asteroid*> asteroids){
 		for (auto asteroids_elem : asteroids)
 		{
@@ -112,11 +186,10 @@ public:
 			{				
 				continue;
 			}
-			else if (GetRadius() + asteroids_elem->GetRadius() + 2
+			else if (GetRadius() + asteroids_elem->GetRadius()
 				>= sqrt(pow(GetCenter().first - asteroids_elem->GetCenter().first, 2)
 					  + pow(GetCenter().second - asteroids_elem->GetCenter().second, 2)))
-			{	
-			
+			{				
 				double d = sqrt(pow(GetCenter().first - asteroids_elem->GetCenter().first, 2)
 					          + pow(GetCenter().second - asteroids_elem->GetCenter().second, 2));
 				double ny = (asteroids_elem->GetCenter().second - GetCenter().second) / d;
@@ -146,7 +219,7 @@ protected:
 class BigAsteroid : public Asteroid
 {
 public:
-	BigAsteroid(int speed, bool is_rand = true, int x_new = 0, int y_new = 0, const char* new_path = "data/big_asteroid.png") {
+	BigAsteroid(std::vector<Asteroid*> asteroids, int speed, bool is_rand = true, int x_new = 0, int y_new = 0) {
 		width = 68;
 		height = 60;		
 		mass = 10;
@@ -154,14 +227,14 @@ public:
 		y = y_new;
 		type = "big";
 		max_speed = 3;
-		AsteroidSingleInit(speed, new_path, is_rand);
+		AsteroidSingleInit(asteroids, speed, "data/big_asteroid.png", is_rand);
 	}
 };
 
 struct SmallAsteroid : public Asteroid
 {
 public:
-	SmallAsteroid(int speed, int x_speed_new = 0, bool is_rand = true, int x_new = 0, int y_new = 0, const char* new_path = "data/small_asteroid.png") {
+	SmallAsteroid(std::vector<Asteroid*> asteroids, int speed, int x_speed_new = 0, bool is_rand = true, int x_new = 0, int y_new = 0) {
 		width = 44;
 		height = 36;
 		mass = 6;
@@ -169,119 +242,220 @@ public:
 		y = y_new;
 		type = "small";
 		max_speed = 4;
-		AsteroidSingleInit(speed, new_path, is_rand, x_speed_new);
+		AsteroidSingleInit(asteroids, speed, "data/small_asteroid.png", is_rand, x_speed_new);
+	}
+};
+
+class Icon : public Object
+{
+public:
+	Icon(bool is_static = true, double x_new = 30, double y_new = 30) {		
+		Init(x_new, y_new);
+	}
+	void Init(double x_new, double y_new) {
+		x = x_new;
+		y = y_new;
+	}
+	Ability GetAbility() {
+		return ability;
+	}
+protected:
+	Ability ability;
+};
+
+class Shield : public Icon
+{
+public:
+	Shield(bool is_static = true, double x_new = 30, double y_new = 30) {
+		if (is_static)
+		{
+			object = createSprite("data/shield_icon.png");
+		}
+		else {
+			object = createSprite("data/shield_icon_small.png");
+		}
+		width = 63;
+		height = 63;
+		ability = Ability::SHIELD;
+		Init(x_new, y_new);
+	}
+};
+
+class Rocket : public Icon
+{
+public:
+	Rocket(bool is_static = true, double x_new = 30, double y_new = 30) {
+		if (is_static)
+		{
+			object = createSprite("data/rocket_icon.png");
+		}
+		else {
+			object = createSprite("data/rocket_icon_small.png");
+		}
+		width = 63;
+		height = 63;
+		ability = Ability::ROCKET;
+		Init(x_new, y_new);
+	}
+};
+
+class AutoShoot : public Icon
+{
+public:
+	AutoShoot(bool is_static = true, double x_new = 30, double y_new = 30) {
+		if (is_static)
+		{
+			object = createSprite("data/autoshoot_icon.png");
+		}
+		else {
+			object = createSprite("data/autoshoot_icon_small.png");
+		}
+		width = 63;
+		height = 63;
+		ability = Ability::AUTO_SHOOT;
+		Init(x_new, y_new);
 	}
 };
 
 class Character : public Object
 {
 public:
-	Character(const char* new_path = "data/spaceship.png", double speed = 2, double shield_duration_in = 80, double new_width = 48, double new_height = 45)
-			: shield_duration(shield_duration_in), self_speed(speed) {
-		object = createSprite(new_path);
-		width = new_width;
-		height = new_height;
+	Character(double speed = 2, double shield_duration_in = 80)
+			: shield_duration(shield_duration_in){
+		object = createSprite("data/spaceship.png");
+		self_speed = speed;
+		width = 48;
+		height = 45;
 		y = WINDOW_HEIGHT / 2 - height /2;
 		x = WINDOW_WIDTH / 2 - width / 2;
 		shield = createSprite("data/shield.png");
 		shield_02 = createSprite("data/shield_02.png");
 		shield_03 = createSprite("data/shield_03.png");
+		power = createSprite("data/spaceship_power.png");
 	}
-	void Move(FRKey k) {
-		switch (k)
+	void AbilityInit() {
+		if (abitity)
 		{
-		case FRKey::RIGHT:
-			impulse.first = self_speed;
-			break;
-		case FRKey::LEFT:
-			impulse.first = -1*self_speed;
-			break;
-		case FRKey::DOWN:
-			impulse.second = self_speed;
-			break;
-		case FRKey::UP:
-			impulse.second = -1*self_speed;
-			break;
-		default:
-			break;
+			shield_time = shield_duration;
+			abitity = NULL;
 		}
-	}
-	void MoveCheck() {
-		double control_num = 0.01;
-		x += impulse.first;
-		y += impulse.second;
-		impulse.first /= 1.01;
-		impulse.second /= 1.01;
-		if (abs(impulse.first)< control_num)
-		{
-			impulse.first = 0;
-		}
-		if (abs(impulse.second) < control_num)
-		{
-			impulse.second = 0;
-		}
-
-	}
-	void Shield() {
-		shield_time = shield_duration;
-		std::cout << shield_time;
 	}
 	void Draw() {
+		if (abs(impulse.first) > 0.2 || abs(impulse.second) > 0.2)
+		{
+			drawSprite(power, x, y);
+		}
 		drawSprite(object, x, y);
 		if (shield_time > 0.1)
 		{
 			if (shield_time < shield_duration / 4)
 			{
-				drawSprite(shield_03, x + width / 2.0 - 81.0 / 2 - 1.3, y + height / 2.0 - 81.0 / 2);
+				drawSprite(shield_03, x + width / 2.0 - shield_size / 2 - 1.3, y + height / 2.0 - shield_size / 2);
 			}
 			else if (shield_time < shield_duration / 2)
 			{
-				drawSprite(shield_02, x + width / 2.0 - 81.0 / 2 - 1.3, y + height / 2.0 - 81.0 / 2);
+				drawSprite(shield_02, x + width / 2.0 - shield_size / 2 - 1.3, y + height / 2.0 - shield_size / 2);
 			}
 			else
 			{
-				drawSprite(shield, x + width / 2.0 - 81.0 / 2 - 1.3, y + height / 2.0 - 81.0 / 2);	
+				drawSprite(shield, x + width / 2.0 - shield_size / 2 - 1.3, y + height / 2.0 - shield_size / 2);
 			}
 			shield_time -= 0.1;
 		}
-
+		MoveCheck();
+		if (abitity)
+		{
+			abitity->Draw();
+		}
 	}
 	bool CheckCollision(Asteroid* asteroid) {
-		if (GetRadius() + asteroid->GetRadius()
-			>= sqrt(pow(GetCenter().first - asteroid->GetCenter().first, 2)
-				+ pow(GetCenter().second - asteroid->GetCenter().second, 2)))
+
+		if (shield_time < 0.1)
 		{
+			if (GetRadius() + asteroid->GetRadius()
+				>= sqrt(pow(GetCenter().first - asteroid->GetCenter().first, 2)
+					+ pow(GetCenter().second - asteroid->GetCenter().second, 2)))
+			{
+				return true;
+			}
+		}
+		else if (shield_time > 0.1) {
+			if (shield_size / 2 + asteroid->GetRadius()
+				>= sqrt(pow(GetCenter().first - asteroid->GetCenter().first, 2)
+					+ pow(GetCenter().second - asteroid->GetCenter().second, 2))) {		
+				double a_speed_x = asteroid->GetSpeed().first * -1;
+				double a_speed_y = asteroid->GetSpeed().second * -1;				
+
+				asteroid->SetSpeed(std::make_pair(a_speed_x, a_speed_y));
+			}
+		}
+		return false;
+	}
+
+	bool CheckCollisionIcon(Icon* icon) {
+		if (GetRadius() + 20
+			>= sqrt(pow(GetCenter().first - icon->GetCenter().first, 2)
+				+ pow(GetCenter().second - icon->GetCenter().second, 2))) {
+			abitity = new Shield();
 			return true;
 		}
 		return false;
 	}
+	void MoveCheck() {
+		impulse.first /= 1.01;
+		impulse.second /= 1.01;
+	}
 private:
+	Sprite* power;
 	Sprite* shield;
 	Sprite* shield_02;
 	Sprite* shield_03;
 	double shield_duration;
 	double shield_time;
-	double self_speed;
-	std::pair<double, double> impulse;
+	double mass = 100;
+	double shield_size = 81;
+	Icon* abitity;
 };
 
 
 class Bullet : public Object
 {
 public:
-	Bullet(int x_start, int y_start, int x_aim, int y_aim, const char* new_path = "data/bullet.png", double bullet_speed = 3, double new_width = 13, double new_height = 12) {
-		object = createSprite(new_path);
-		width = new_width;
-		height = new_height;
+	Bullet(int x_start, int y_start, int x_aim, int y_aim, double bullet_speed = 4) {
+		object = createSprite("data/bullet.png");
+		width = 13;
+		height = 13;
 		y = y_start - (height / 2);								
 		x = x_start - (width / 2);
-		y_speed = (y_aim + (height / 2)) - y_start;
-		x_speed = (x_aim + (width / 2)) - x_start;
+		y_speed = y_aim - y_start;
+		x_speed = x_aim - x_start;
 		double param = abs(y_speed) + abs(x_speed);
 		param = bullet_speed / param;
 		y_speed *= param;
 		x_speed *= param;
 	}
+	bool Border() {
+		if (x + width / 2 >= MAP_WIDTH)
+		{
+			return true;
+		}
+		else if (x < (width / 2) * -1)
+		{
+			return true;
+
+		}
+		if (y + height / 2 >= MAP_HEIGHT)
+		{
+			return true;
+
+		}
+		else if (y < (height / 2) * -1)
+		{
+			return true;
+
+		}
+		return false;
+	};
 private:
 	double bullet_speed;
 };
@@ -289,10 +463,10 @@ private:
 class Reticle : public Object
 {
 public:
-	Reticle(const char* new_path = "data/reticle.png", double bullet_reload_duration = 20, double new_width = 35, double new_height = 34) : reload_duration(bullet_reload_duration){
-		object = createSprite(new_path);
-		width = new_width;
-		height = new_height;
+	Reticle(double bullet_reload_duration = 20) : reload_duration(bullet_reload_duration){
+		object = createSprite("data/reticle2.png");
+		width = 65;
+		height = 64;
 		y = 0;
 		x = 0;
 	}
@@ -303,17 +477,23 @@ public:
 	void Shoot(int x_ship, int y_ship) {
 		if (reload_time < 0.1)
 		{
-			bullets.push_back(new Bullet(x_ship, y_ship, x, y));
+			bullets.push_back(new Bullet(x_ship, y_ship, GetCenter().first, GetCenter().second));
 			reload_time = reload_duration;
 		}				
+	}
+	bool Disappear(Bullet* b) {		
+		return b->Border();
 	}
 	void Draw() {
 		drawSprite(object, x, y);
 		for (auto bullet : bullets)
 		{
+			bullet->MoveCheck();
 			bullet->Draw();
 			bullet->Move();
 		}
+		std::erase_if(bullets, [this](Bullet* b) -> bool {
+			return Disappear(b); });
 		reload_time -= 0.2;		
 	}
 
@@ -360,11 +540,18 @@ public:
 	}
 
 	virtual bool Init() {
-		background = createSprite("data/background.png");
-		for (int i = 0; i < 5; i++)
+		background = createSprite("data/background_2.png");
+
+		for (int i = 0; i < NUM_ASTEROIDS; i++)
 		{
-			asteroids.push_back(new BigAsteroid((rand()%5+1)));
-			asteroids.push_back(new SmallAsteroid((rand() % 5 + 1)));
+			if (i < NUM_ASTEROIDS / 2)
+			{
+				asteroids.push_back(new BigAsteroid(asteroids, (rand() % 5 + 1)));
+			}
+			else
+			{
+				asteroids.push_back(new SmallAsteroid(asteroids, (rand() % 5 + 1)));
+			}
 		}
 		battleship = new Character();
 		reticle = new Reticle();
@@ -377,39 +564,60 @@ public:
 	}
 
 	virtual bool Tick() {
+		showCursor(false);
 		//drawTestBackground();
-		for (int i = 0; i < 800; i+=204)
+		/*for (int i = 0; i < WINDOW_WIDTH; i+=204)
 		{
-			for (int j = 0; j < 600; j+=140)
+			for (int j = 0; j < WINDOW_HEIGHT; j+=140)
 			{
 				drawSprite(background, i, j);
 			}
-		}
+		}*/
+
+		drawSprite(background, -100, -100);
 		std::vector<Asteroid*> asteroids_temp;
 		for (auto asteroid : asteroids)
 		{
 			asteroid->EachOtherCollision(asteroids);
-			asteroid->Move();
+			asteroid->Move();	
+			asteroid->Draw();
 			if (battleship->CheckCollision(asteroid))
 			{
 				std::cout << "Game over!";
 				return 1;
 			}
-			asteroid->Draw();
 			if (reticle->CheckShoot(asteroid, false) && asteroid->GetType() == "big")
 			{
-				asteroids_temp.push_back(new SmallAsteroid(0, -1.5, false, asteroid->GetCoords().first + 12, asteroid->GetCoords().second - 10));
-				asteroids_temp.push_back(new SmallAsteroid(0, 1.5, false, asteroid->GetCoords().first + 12, asteroid->GetCoords().second + 35));
+				asteroids_temp.push_back(new SmallAsteroid(asteroids, 0, -1.5, false, asteroid->GetCoords().first + 12, asteroid->GetCoords().second - 10));
+				asteroids_temp.push_back(new SmallAsteroid(asteroids, 0, 1.5, false, asteroid->GetCoords().first + 12, asteroid->GetCoords().second + 35));
+			}
+			if (reticle->CheckShoot(asteroid, false) && asteroid->GetType() == "small")
+			{
+				if (rand()%int((ABILITY_PROBABILITY*10)) == 0)
+				{
+					icons.push_back(new Shield(false, asteroid->GetCoords().first, asteroid->GetCoords().second));					
+				}				
 			}
 		}
 		std::erase_if(asteroids, [this](Asteroid* a) -> bool {
 			return reticle->CheckShoot(a); });
 		for (auto asteroid : asteroids_temp)
-		{
+		{			
 			asteroids.push_back(asteroid);
 		}
+		for (auto icon : icons)
+		{
+			icon->Draw();
+			icon->MoveCheck();
+		}
+		std::erase_if(icons, [this](Icon* i) -> bool {
+			return battleship->CheckCollisionIcon(i); });
+		for (auto asteroid : asteroids)
+		{
+			asteroid->MoveCheck();
+		}	
+		
 		battleship->Draw();
-		battleship->MoveCheck();
 		reticle->Draw();
 		return false;
 	}
@@ -427,7 +635,7 @@ public:
 		case FRMouseButton::MIDDLE:
 			break;
 		case FRMouseButton::RIGHT:
-			battleship->Shield();
+			battleship->AbilityInit();
 			break;
 		case FRMouseButton::COUNT:
 			break;
@@ -437,7 +645,15 @@ public:
 	}
 
 	virtual void onKeyPressed(FRKey k) {
-		battleship->Move(k);
+		for (auto asteroid : asteroids)
+		{
+			asteroid->MoveManual(k);
+		}
+		for (auto icon : icons)
+		{
+			icon->MoveManual(k);
+		}
+		battleship->MoveManual(k);
 	}
 
 	virtual void onKeyReleased(FRKey k) {
@@ -452,9 +668,9 @@ private:
 	Sprite* background;
 	Character* battleship;
 	std::vector<Asteroid*> asteroids;
+	std::vector<Icon*> icons;
+
 	Reticle* reticle;
-	int WINDOW_WIDTH = 800;
-	int WINDOW_HEIGHT = 600;
 
 	 void asteroidsSpawn(int count, const char* path) {
 		for (int i = 0; i < count; i++)
@@ -464,12 +680,37 @@ private:
 	}
 };
 
-
 int main(int argc, char* argv[])
 {
+	for (int i = 0; i < sizeof(argv) - 1; i++)
+	{
+		if (argv[i] == "-window")
+		{
+			WINDOW_WIDTH = atoi(argv[i + 1]);
+		}
+		else if (argv[i] == "-map")
+		{
+			WINDOW_WIDTH = atoi(argv[i + 1]);
+		}
+		else if (argv[i] == "-num_asteroids")
+		{
+			WINDOW_WIDTH = atoi(argv[i + 1]);
+		}
+		else if (argv[i] == "-num_ammo")
+		{
+			WINDOW_WIDTH = atoi(argv[i + 1]);
+		}
+		else if (argv[i] == "-ability_probability")
+		{
+			WINDOW_WIDTH = atoi(argv[i + 1]);
+		}
+	}
+	srand(time(NULL));
 	while (true)
 	{
 		run(new MyFramework);
 	}
 	return 0;
 }
+
+//game.exe -window 800x600 -map 1000x1000 -num_asteroids 10 -num_ammo 3 -ability_probability 0.3
