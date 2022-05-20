@@ -129,9 +129,6 @@ public:
 				}
 			}
 		}
-		std::cout << rotation;
-		//system("cls");
-		//std::cout << x_mouse << " "<< y_mouse;
 	}
 
 	void SetRotSprite() {
