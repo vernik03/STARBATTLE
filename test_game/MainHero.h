@@ -1,6 +1,8 @@
 #pragma once
 #include "Object.h"
 #include "Asteroids.h"
+
+
 enum class Ability {
 	SHIELD,
 	ROCKET,
@@ -74,7 +76,7 @@ public:
 		object = createSprite("data/spaceship.png");
 		self_speed = speed;
 		width = 48;
-		height = 45;
+		height = 48;
 		y = WINDOW_HEIGHT / 2 - height / 2;
 		x = WINDOW_WIDTH / 2 - width / 2;
 		shield = createSprite("data/shield.png");
@@ -89,10 +91,81 @@ public:
 			abitity = NULL;
 		}
 	}
+
+	void SetRot(int x_mouse, int y_mouse) {
+		if (x_mouse <= WINDOW_WIDTH / 2)
+		{
+			if (abs(x_mouse- WINDOW_WIDTH / 2) > abs(y_mouse- WINDOW_WIDTH / 2))
+			{
+				rotation = 2;
+			}
+			else
+			{
+				if (y_mouse <= WINDOW_HEIGHT / 2)
+				{
+					rotation = 1;
+				}
+				else
+				{
+					rotation = 3;
+				}
+			}
+		}
+		else
+		{
+			if (abs(x_mouse- WINDOW_WIDTH / 2) > abs(y_mouse- WINDOW_WIDTH / 2))
+			{
+				rotation = 4;
+			}
+			else
+			{
+				if (y_mouse <= WINDOW_HEIGHT / 2)
+				{
+					rotation = 1;
+				}
+				else
+				{
+					rotation = 3;
+				}
+			}
+		}
+		std::cout << rotation;
+		//system("cls");
+		//std::cout << x_mouse << " "<< y_mouse;
+	}
+
+	void SetRotSprite() {
+		switch (rotation)
+		{
+		case 1:
+		object = createSprite("data/spaceship.png");
+		power = createSprite("data/spaceship_power.png");
+
+			break;
+		case 2:
+			object = createSprite("data/spaceship_l.png");
+			power = createSprite("data/spaceship_power_l.png");
+
+			break;
+		case 3:
+			object = createSprite("data/spaceship_b.png");
+			power = createSprite("data/spaceship_power_b.png");
+
+			break;
+		case 4:
+			object = createSprite("data/spaceship_r.png");
+			power = createSprite("data/spaceship_power_r.png");
+			break;
+		default:
+			break;
+		}
+	}
+
 	void Draw() {
+		SetRotSprite();
 		if (abs(impulse.first) > 0.2 || abs(impulse.second) > 0.2)
 		{
-			drawSprite(power, x, y);
+			drawSprite(power, x-29, y-29);
 		}
 		drawSprite(object, x, y);
 		if (shield_time > 0.1)
@@ -164,6 +237,7 @@ private:
 	double mass = 100;
 	double shield_size = 81;
 	Icon* abitity;
+	int rotation;
 };
 
 class Bullet : public Object

@@ -105,6 +105,7 @@ public:
 
 	virtual void onMouseMove(int x, int y, int xrelative, int yrelative) {
 		reticle->SetPos(x,y);
+		battleship->SetRot(x, y);
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
